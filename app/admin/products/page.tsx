@@ -4,18 +4,22 @@ import ProductManager from './ProductManager'
 
 export default async function AdminProductsPage() {
   const supabase = createServerClient()
-  const [{ data: products }, { data: categories }] = await Promise.all([
-    supabase.from('products').select('*, categories(id, name)').order('created_at', { ascending: false }),
+  const [{ data: products, count }, { data: categories }] = await Promise.all([
+    supabase.from('products').select('*', { count: 'exact' }).order('created_at', { ascending: false }).range(0, 19),
     supabase.from('categories').select('*').order('sort_order').order('created_at'),
   ])
 
+  const catMap = Object.fromEntries((categories ?? []).map((c) => [c.id, c]))
+  const enriched = (products ?? []).map((p) => ({
+    ...p,
+    categories: p.category_id ? catMap[p.category_id] ?? null : null,
+  }))
+
   return (
-    <div className="p-8">
-      <p className="text-[12px] font-semibold tracking-widest uppercase mb-1" style={{ color: '#F5A623' }}>Products</p>
-      <h1 className="text-[22px] font-bold mb-1" style={{ color: '#17182D', letterSpacing: '-0.02em' }}>상품 관리</h1>
-      <p className="text-[13px] mb-8" style={{ color: 'rgba(23,24,45,0.4)' }}>판매할 과일 상품을 등록하고 관리하세요.</p>
+    <div className="p-5 lg:p-8">
       <ProductManager
-        initialProducts={(products as Product[]) ?? []}
+        initialProducts={enriched as Product[]}
+        initialTotal={count ?? 0}
         categories={(categories as Category[]) ?? []}
       />
     </div>

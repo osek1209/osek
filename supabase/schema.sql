@@ -1,46 +1,89 @@
 -- 사용자 테이블
-create table if not exists users (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  phone text not null unique,
-  password_hash text not null,
-  role text not null default 'customer' check (role in ('customer', 'admin')),
-  created_at timestamptz default now()
+CREATE TABLE IF NOT EXISTS users (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  phone text NOT NULL UNIQUE,
+  password_hash text NOT NULL,
+  role text NOT NULL DEFAULT 'customer' CHECK (role IN ('customer', 'admin')),
+  created_at timestamptz DEFAULT now()
+);
+
+-- 카테고리 테이블
+CREATE TABLE IF NOT EXISTS categories (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  sort_order int DEFAULT 0,
+  created_at timestamptz DEFAULT now()
 );
 
 -- 상품 테이블
-create table if not exists products (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
+CREATE TABLE IF NOT EXISTS products (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL,
   description text,
-  price integer not null check (price >= 0),
+  price integer NOT NULL CHECK (price >= 0),
+  stock integer NOT NULL DEFAULT 0,
   image_url text,
-  is_available boolean not null default true,
-  created_at timestamptz default now()
+  is_available boolean NOT NULL DEFAULT true,
+  category_id uuid REFERENCES categories(id) ON DELETE SET NULL,
+  created_at timestamptz DEFAULT now()
 );
 
 -- 예약 테이블
-create table if not exists reservations (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references users(id),
-  status text not null default 'pending' check (status in ('pending', 'confirmed', 'completed', 'cancelled')),
+CREATE TABLE IF NOT EXISTS reservations (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id),
+  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'completed', 'cancelled')),
   note text,
-  created_at timestamptz default now()
+  created_at timestamptz DEFAULT now()
 );
 
 -- 예약 항목 테이블
-create table if not exists reservation_items (
-  id uuid primary key default gen_random_uuid(),
-  reservation_id uuid not null references reservations(id) on delete cascade,
-  product_id uuid not null references products(id),
-  quantity integer not null check (quantity > 0)
+CREATE TABLE IF NOT EXISTS reservation_items (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  reservation_id uuid NOT NULL REFERENCES reservations(id) ON DELETE CASCADE,
+  product_id uuid NOT NULL REFERENCES products(id),
+  quantity integer NOT NULL CHECK (quantity > 0)
 );
 
 -- RLS 비활성화 (service_role 키로만 접근)
-alter table users disable row level security;
-alter table products disable row level security;
-alter table reservations disable row level security;
-alter table reservation_items disable row level security;
+ALTER TABLE users DISABLE ROW LEVEL SECURITY;
+ALTER TABLE categories DISABLE ROW LEVEL SECURITY;
+ALTER TABLE products DISABLE ROW LEVEL SECURITY;
+ALTER TABLE reservations DISABLE ROW LEVEL SECURITY;
+ALTER TABLE reservation_items DISABLE ROW LEVEL SECURITY;
+
+-- 동시 예약 방지: 재고 원자적 차감 + 예약 생성
+CREATE OR REPLACE FUNCTION create_reservation_atomic(p_user_id uuid, p_note text, p_items jsonb)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE v_id uuid; v_item jsonb; v_n int;
+BEGIN
+  FOR v_item IN SELECT value FROM jsonb_array_elements(p_items) LOOP
+    UPDATE products
+       SET stock = stock - (v_item->>'quantity')::int
+     WHERE id = (v_item->>'product_id')::uuid
+       AND stock >= (v_item->>'quantity')::int
+       AND is_available = true;
+    GET DIAGNOSTICS v_n = ROW_COUNT;
+    IF v_n = 0 THEN RAISE EXCEPTION 'STOCK_EXHAUSTED:%', v_item->>'product_id'; END IF;
+  END LOOP;
+  INSERT INTO reservations (user_id, note) VALUES (p_user_id, p_note) RETURNING id INTO v_id;
+  INSERT INTO reservation_items (reservation_id, product_id, quantity)
+  SELECT v_id, (e.value->>'product_id')::uuid, (e.value->>'quantity')::int
+  FROM jsonb_array_elements(p_items) e;
+  RETURN jsonb_build_object('id', v_id);
+END;
+$$;
+
+-- 예약 취소 시 재고 복원
+CREATE OR REPLACE FUNCTION restore_stock_on_cancel(p_reservation_id uuid) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  UPDATE products p SET stock = p.stock + ri.quantity
+  FROM reservation_items ri
+  WHERE ri.reservation_id = p_reservation_id AND ri.product_id = p.id;
+END;
+$$;
 
 -- 관리자 계정 생성 예시 (비밀번호는 앱에서 bcrypt로 해시해서 직접 INSERT)
--- insert into users (name, phone, password_hash, role) values ('관리자', '01000000000', '$2a$10$...', 'admin');
+-- INSERT INTO users (name, phone, password_hash, role) VALUES ('관리자', '01000000000', '$2a$10$...', 'admin');

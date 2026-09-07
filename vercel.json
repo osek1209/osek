@@ -1,0 +1,9 @@
+{
+  "regions": ["icn1"],
+  "crons": [
+    {
+      "path": "/api/reservations/cron-no-show",
+      "schedule": "0 10 * * *"
+    }
+  ]
+}

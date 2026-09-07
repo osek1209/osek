@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
   const supabase = createServerClient()
   const { data: user } = await supabase
     .from('users')
-    .select('id, name, role, password_hash')
+    .select('id, name, phone, role, password_hash')
     .eq('phone', phone)
     .single()
 
@@ -26,6 +26,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '전화번호 또는 비밀번호가 올바르지 않습니다.' }, { status: 401 })
   }
 
-  await setSessionCookie({ id: user.id, name: user.name, role: user.role })
+  await setSessionCookie({ id: user.id, name: user.name, phone: user.phone, role: user.role })
   return NextResponse.json({ success: true, role: user.role })
 }

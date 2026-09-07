@@ -1,136 +1,138 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { createServerClient } from '@/lib/supabase/server'
+import { getSession } from '@/lib/session'
 import { ArrowRight } from 'lucide-react'
-import { MotionReveal, MotionStagger, MotionItem } from '@/components/motion/MotionReveal'
 import HeroSection from './HeroSection'
 import type { Product } from '@/lib/types'
 
 export default async function LandingPage() {
   const supabase = createServerClient()
-  const { data: products } = await supabase
-    .from('products')
-    .select('*')
-    .eq('is_available', true)
-    .order('created_at', { ascending: false })
-    .limit(8)
+  const [session, { data: products }] = await Promise.all([
+    getSession(),
+    supabase.from('products').select('id, name, price, image_url, badge, stock').eq('is_available', true).order('created_at', { ascending: false }).limit(6),
+  ])
 
   return (
     <div>
-      <HeroSection />
+      <HeroSection isLoggedIn={!!session} />
 
-      {/* ── Products ── */}
-      <section className="py-20" style={{ background: '#FFFFFF' }}>
-        <div className="max-w-6xl mx-auto px-8">
-          <MotionReveal>
-            <div className="flex items-end justify-between mb-10">
-              <div>
-                <p className="text-[11px] font-bold tracking-[0.15em] uppercase mb-3" style={{ color: '#F5A623' }}>Today&apos;s Pick</p>
-                <h2 className="text-[32px] font-bold" style={{ color: '#17182D', letterSpacing: '-0.025em' }}>
-                  지금 예약 가능한 상품
-                </h2>
-              </div>
-              <Link
-                href="/products"
-                className="hidden md:inline-flex items-center gap-1.5 text-[14px] font-semibold px-5 py-2.5 transition-opacity hover:opacity-70"
-                style={{ color: '#F5A623', border: '1.5px solid rgba(245,166,35,0.3)', borderRadius: 12 }}
-              >
-                전체보기 <ArrowRight size={14} />
-              </Link>
+      {/* Products */}
+      <section className="py-10 md:py-16" style={{ background: '#FFFFFF' }}>
+        <div className="max-w-6xl mx-auto px-5 md:px-8">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <p className="text-[11px] font-bold tracking-[0.15em] uppercase mb-1" style={{ color: '#F5A623' }}>Today&apos;s Pick</p>
+              <h2 className="text-[20px] md:text-[28px] font-bold" style={{ color: '#17182D', letterSpacing: '-0.02em' }}>지금 예약 가능한 상품</h2>
             </div>
-          </MotionReveal>
+            <Link
+              href="/products"
+              className="flex items-center gap-1 text-[13px] font-semibold px-4 py-2 rounded-xl transition-opacity hover:opacity-70 shrink-0"
+              style={{ color: '#F5A623', border: '1.5px solid rgba(245,166,35,0.3)' }}
+            >
+              전체보기 <ArrowRight size={13} />
+            </Link>
+          </div>
 
           {products && products.length > 0 ? (
-            <MotionStagger className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {(products as Product[]).map((p) => (
-                <MotionItem key={p.id}>
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+                {(products as Product[]).map((p) => (
                   <Link
+                    key={p.id}
                     href="/products"
-                    className="group block rounded-[20px] overflow-hidden transition-all duration-300 hover:-translate-y-2"
+                    className="group block rounded-[16px] overflow-hidden"
                     style={{ background: '#F8F8F5', boxShadow: '0 2px 8px rgba(23,24,45,0.06)' }}
                   >
-                    <div className="h-44 overflow-hidden relative" style={{ background: '#FFF0E5' }}>
+                    <div className="h-32 md:h-44 overflow-hidden relative" style={{ background: '#FFF0E5' }}>
                       {p.image_url ? (
-                        <img src={p.image_url} alt={p.name} className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                        <Image src={p.image_url} alt={p.name} fill sizes="(max-width: 768px) 50vw, 33vw" className="object-cover group-hover:scale-105 transition-transform duration-300" />
                       ) : (
-                        <div className="h-full w-full flex items-center justify-center" style={{ fontSize: 48 }}>
-                          🍊
-                        </div>
+                        <div className="h-full w-full flex items-center justify-center text-4xl">🍊</div>
                       )}
-                      <div className="absolute top-3 right-3">
-                        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: 'rgba(229,243,233,0.95)', color: '#15803d' }}>예약가능</span>
-                      </div>
+                      {(() => { const [bt, bc] = (p.badge ?? '').split('|'); return bt ? <span className="absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-md text-white" style={{ background: bc || '#F5A623' }}>{bt}</span> : null })()}
                     </div>
-                    <div className="p-4">
-                      <p className="font-bold text-[14px] mb-0.5 truncate" style={{ color: '#17182D' }}>{p.name}</p>
-                      {p.description && (
-                        <p className="text-[12px] line-clamp-1 mb-2.5" style={{ color: 'rgba(23,24,45,0.4)' }}>{p.description}</p>
-                      )}
-                      <p className="font-black text-[17px]" style={{ color: '#F5A623' }}>{p.price.toLocaleString()}원</p>
+                    <div className="p-3 md:p-4">
+                      <p className="font-bold text-[13px] md:text-[14px] truncate mb-0.5" style={{ color: '#17182D' }}>{p.name}</p>
+                      <p className="font-black text-[15px] md:text-[17px]" style={{ color: '#F5A623' }}>{p.price.toLocaleString()}원</p>
                     </div>
                   </Link>
-                </MotionItem>
-              ))}
-            </MotionStagger>
+                ))}
+              </div>
+              <div className="mt-5 text-center">
+                <Link
+                  href="/products"
+                  className="inline-flex items-center gap-2 px-7 py-3 rounded-2xl text-[14px] font-semibold transition-opacity hover:opacity-80"
+                  style={{ background: '#F8F8F5', color: '#17182D', border: '1px solid rgba(23,24,45,0.1)' }}
+                >
+                  상품 전체보기 <ArrowRight size={14} />
+                </Link>
+              </div>
+            </>
           ) : (
-            <div className="text-center py-20 text-[14px]" style={{ color: 'rgba(23,24,45,0.35)' }}>
-              현재 등록된 상품이 없습니다.
-            </div>
+            <div className="text-center py-16 text-[14px]" style={{ color: 'rgba(23,24,45,0.35)' }}>현재 등록된 상품이 없습니다.</div>
           )}
         </div>
       </section>
 
-      {/* ── How it works ── */}
-      <section className="py-20" style={{ background: '#F8F8F5' }}>
-        <div className="max-w-6xl mx-auto px-8">
-          <MotionReveal>
-            <p className="text-[11px] font-bold tracking-[0.15em] uppercase mb-3 text-center" style={{ color: '#F5A623' }}>How it works</p>
-            <h2 className="text-[28px] font-bold text-center mb-14" style={{ color: '#17182D', letterSpacing: '-0.02em' }}>
-              3단계면 완료
-            </h2>
-          </MotionReveal>
-          <MotionStagger className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* How it works */}
+      <section className="py-10 md:py-16" style={{ background: '#F8F8F5' }}>
+        <div className="max-w-6xl mx-auto px-5 md:px-8">
+          <p className="text-[11px] font-bold tracking-[0.15em] uppercase mb-1 text-center" style={{ color: '#F5A623' }}>How it works</p>
+          <h2 className="text-[20px] md:text-[26px] font-bold text-center mb-6 md:mb-10" style={{ color: '#17182D', letterSpacing: '-0.02em' }}>3단계면 완료</h2>
+          {/* Mobile: vertical step list */}
+          <div className="flex flex-col gap-2 md:hidden">
             {[
-              { step: '01', title: '회원가입', desc: '이름과 연락처로\n간단하게 가입', bg: '#FFF0E5', color: '#F5A623' },
-              { step: '02', title: '상품 선택', desc: '원하는 과일을\n수량 지정해서 담기', bg: '#DCEBFF', color: '#1d4ed8' },
-              { step: '03', title: '픽업', desc: '예약 후 매장 방문\n현장 결제로 간편하게', bg: '#E5F3E9', color: '#15803d' },
+              { step: '01', title: '회원가입', desc: '이름·연락처로 가입', bg: '#FFF0E5', color: '#F5A623' },
+              { step: '02', title: '상품 선택', desc: '수량 지정해서 담기', bg: '#DCEBFF', color: '#1d4ed8' },
+              { step: '03', title: '픽업', desc: '방문 후 현장 결제', bg: '#E5F3E9', color: '#15803d' },
             ].map((s) => (
-              <MotionItem key={s.step}>
-                <div className="rounded-[24px] p-8 transition-all duration-300 hover:-translate-y-1" style={{ background: '#FFFFFF', boxShadow: '0 2px 12px rgba(23,24,45,0.05)' }}>
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-5" style={{ background: s.bg }}>
-                    <span className="text-[13px] font-black" style={{ color: s.color }}>{s.step}</span>
-                  </div>
-                  <h3 className="text-[18px] font-bold mb-2" style={{ color: '#17182D' }}>{s.title}</h3>
-                  <p className="text-[14px] leading-relaxed whitespace-pre-line" style={{ color: 'rgba(23,24,45,0.5)' }}>{s.desc}</p>
+              <div key={s.step} className="flex items-center gap-4 px-4 py-3.5 rounded-2xl" style={{ background: '#FFFFFF', boxShadow: '0 1px 6px rgba(23,24,45,0.05)' }}>
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: s.bg }}>
+                  <span className="text-[11px] font-black" style={{ color: s.color }}>{s.step}</span>
                 </div>
-              </MotionItem>
+                <div>
+                  <h3 className="text-[14px] font-bold leading-tight" style={{ color: '#17182D' }}>{s.title}</h3>
+                  <p className="text-[12px]" style={{ color: 'rgba(23,24,45,0.5)' }}>{s.desc}</p>
+                </div>
+              </div>
             ))}
-          </MotionStagger>
+          </div>
+          {/* Desktop: card grid */}
+          <div className="hidden md:grid grid-cols-3 gap-6">
+            {[
+              { step: '01', title: '회원가입', desc: '이름·연락처로 가입', bg: '#FFF0E5', color: '#F5A623' },
+              { step: '02', title: '상품 선택', desc: '수량 지정해서 담기', bg: '#DCEBFF', color: '#1d4ed8' },
+              { step: '03', title: '픽업', desc: '방문 후 현장 결제', bg: '#E5F3E9', color: '#15803d' },
+            ].map((s) => (
+              <div key={s.step} className="rounded-[20px] p-8" style={{ background: '#FFFFFF', boxShadow: '0 2px 12px rgba(23,24,45,0.05)' }}>
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-5" style={{ background: s.bg }}>
+                  <span className="text-[13px] font-black" style={{ color: s.color }}>{s.step}</span>
+                </div>
+                <h3 className="text-[18px] font-bold mb-1" style={{ color: '#17182D' }}>{s.title}</h3>
+                <p className="text-[14px] leading-relaxed" style={{ color: 'rgba(23,24,45,0.5)' }}>{s.desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* ── CTA ── */}
-      <section className="py-16" style={{ background: '#FFFFFF' }}>
-        <div className="max-w-6xl mx-auto px-8">
-          <MotionReveal>
-            <div className="rounded-[28px] px-12 py-14 flex flex-col md:flex-row items-center justify-between gap-8" style={{ background: '#FFF0E5' }}>
-              <div>
-                <p className="text-[11px] font-bold tracking-[0.15em] uppercase mb-3" style={{ color: '#F5A623' }}>Get started</p>
-                <h2 className="text-[28px] font-bold mb-2" style={{ color: '#17182D', letterSpacing: '-0.02em' }}>
-                  지금 바로 시작하세요
-                </h2>
-                <p className="text-[15px]" style={{ color: 'rgba(23,24,45,0.5)' }}>
-                  회원가입 1분이면 첫 예약 완료입니다.
-                </p>
-              </div>
-              <Link
-                href="/register"
-                className="shrink-0 inline-flex items-center gap-2.5 font-bold text-[15px] text-white px-8 py-4 transition-opacity hover:opacity-85"
-                style={{ background: '#F5A623', borderRadius: 14, whiteSpace: 'nowrap' }}
-              >
-                무료 회원가입 <ArrowRight size={16} />
-              </Link>
+      {/* CTA */}
+      <section className="py-8 md:py-12" style={{ background: '#FFFFFF' }}>
+        <div className="max-w-6xl mx-auto px-5 md:px-8">
+          <div className="rounded-[24px] px-6 py-8 md:px-12 md:py-12 flex flex-col md:flex-row items-center justify-between gap-5 md:gap-8" style={{ background: '#FFF0E5' }}>
+            <div>
+              <h2 className="text-[20px] md:text-[26px] font-bold mb-1" style={{ color: '#17182D', letterSpacing: '-0.02em' }}>지금 바로 시작하세요</h2>
+              <p className="text-[13px] md:text-[15px]" style={{ color: 'rgba(23,24,45,0.5)' }}>회원가입 1분이면 첫 예약 완료</p>
             </div>
-          </MotionReveal>
+            <Link
+              href="/register"
+              className="shrink-0 inline-flex items-center gap-2 font-bold text-[14px] md:text-[15px] text-white px-6 md:px-8 py-3 md:py-4 rounded-2xl transition-opacity hover:opacity-85"
+              style={{ background: '#F5A623', whiteSpace: 'nowrap' }}
+            >
+              무료 회원가입 <ArrowRight size={15} />
+            </Link>
+          </div>
         </div>
       </section>
     </div>

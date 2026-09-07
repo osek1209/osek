@@ -22,7 +22,7 @@ export async function GET() {
       quantity: number
       products: { name: string; price: number } | null
     }) => ({
-      예약일시: new Date(r.created_at).toLocaleString('ko-KR'),
+      예약일시: new Date(r.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
       예약번호: r.id.slice(0, 8).toUpperCase(),
       이름: r.users?.name ?? '',
       전화번호: r.users?.phone ?? '',

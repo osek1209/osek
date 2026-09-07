@@ -11,6 +11,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   const { id } = await params
   const { status } = await request.json()
   const supabase = createServerClient()
+
+  // Get current status before updating
+  const { data: current } = await supabase
+    .from('reservations')
+    .select('status')
+    .eq('id', id)
+    .single()
+
   const { data, error } = await supabase
     .from('reservations')
     .update({ status })
@@ -19,5 +27,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Restore stock when cancelling a non-cancelled reservation
+  if (status === 'cancelled' && current?.status !== 'cancelled') {
+    await supabase.rpc('restore_stock_on_cancel', { p_reservation_id: id })
+  }
+
   return NextResponse.json(data)
 }

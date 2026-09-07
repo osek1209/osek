@@ -7,13 +7,13 @@ import { MotionReveal } from '@/components/motion/MotionReveal'
 export default async function ProductsPage() {
   const supabase = createServerClient()
   const [{ data: products }, { data: categories }, session] = await Promise.all([
-    supabase.from('products').select('*, categories(id, name)').eq('is_available', true).order('created_at', { ascending: false }),
+    supabase.from('products').select('*').eq('is_available', true).order('created_at', { ascending: false }),
     supabase.from('categories').select('*').order('sort_order').order('created_at'),
     getSession(),
   ])
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-12">
+    <div className="max-w-5xl mx-auto px-6 py-6 lg:py-12">
       <MotionReveal>
         <p className="text-[12px] font-semibold tracking-widest uppercase mb-2" style={{ color: '#F5A623' }}>Products</p>
         <h1 className="text-[26px] font-bold mb-1" style={{ color: '#17182D', letterSpacing: '-0.02em' }}>예약 상품</h1>
@@ -22,7 +22,6 @@ export default async function ProductsPage() {
       <ProductList
         products={(products as Product[]) ?? []}
         categories={(categories as Category[]) ?? []}
-        isLoggedIn={!!session}
       />
     </div>
   )

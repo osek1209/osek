@@ -25,13 +25,13 @@ export async function POST(request: NextRequest) {
   const { data: user, error } = await supabase
     .from('users')
     .insert({ name, phone, password_hash, role: 'customer' })
-    .select('id, name, role')
+    .select('id, name, phone, role')
     .single()
 
   if (error || !user) {
     return NextResponse.json({ error: '회원가입 중 오류가 발생했습니다.' }, { status: 500 })
   }
 
-  await setSessionCookie({ id: user.id, name: user.name, role: user.role })
+  await setSessionCookie({ id: user.id, name: user.name, phone: user.phone, role: user.role })
   return NextResponse.json({ success: true })
 }
