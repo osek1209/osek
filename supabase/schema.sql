@@ -46,12 +46,24 @@ CREATE TABLE IF NOT EXISTS reservation_items (
   quantity integer NOT NULL CHECK (quantity > 0)
 );
 
+-- 약관 테이블
+CREATE TABLE IF NOT EXISTS terms (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  content text NOT NULL,
+  is_required boolean NOT NULL DEFAULT true,
+  is_active boolean NOT NULL DEFAULT true,
+  sort_order integer NOT NULL DEFAULT 0,
+  created_at timestamptz DEFAULT now()
+);
+
 -- RLS 비활성화 (service_role 키로만 접근)
 ALTER TABLE users DISABLE ROW LEVEL SECURITY;
 ALTER TABLE categories DISABLE ROW LEVEL SECURITY;
 ALTER TABLE products DISABLE ROW LEVEL SECURITY;
 ALTER TABLE reservations DISABLE ROW LEVEL SECURITY;
 ALTER TABLE reservation_items DISABLE ROW LEVEL SECURITY;
+ALTER TABLE terms DISABLE ROW LEVEL SECURITY;
 
 -- 동시 예약 방지: 재고 원자적 차감 + 예약 생성
 CREATE OR REPLACE FUNCTION create_reservation_atomic(p_user_id uuid, p_note text, p_items jsonb)
