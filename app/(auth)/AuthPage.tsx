@@ -264,7 +264,7 @@ export default function AuthPage({ defaultTab }: { defaultTab: 'login' | 'regist
                     <button onClick={handleRegister} disabled={loading}
                       className="w-full py-3.5 font-bold text-[15px] text-white disabled:opacity-50"
                       style={{ background: '#F5A623', borderRadius: 12 }}>
-                      {loading ? '가입 중...' : '가입 완료'}
+                      {loading ? '가입 중...' : '가입하기'}
                     </button>
               </div>
             )}
