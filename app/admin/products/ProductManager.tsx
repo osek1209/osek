@@ -194,7 +194,8 @@ export default function ProductManager({ initialProducts, initialTotal, categori
     e.preventDefault()
     setFormLoading(true)
     const badge = form.badge_text.trim() ? `${form.badge_text.trim()}|${form.badge_color}` : null
-    const body = { ...form, price: Number(form.price), stock: Number(form.stock), category_id: form.category_id || null, badge }
+    const { badge_text: _bt, badge_color: _bc, ...rest } = form
+    const body = { ...rest, price: Number(form.price), stock: Number(form.stock), category_id: form.category_id || null, badge }
     const catMap = Object.fromEntries(categories.map((c) => [c.id, c]))
     if (editId) {
       const res = await fetch(`/api/products/${editId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })

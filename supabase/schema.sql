@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS products (
   image_url text,
   is_available boolean NOT NULL DEFAULT true,
   category_id uuid REFERENCES categories(id) ON DELETE SET NULL,
+  badge text,
   created_at timestamptz DEFAULT now()
 );
 
@@ -57,6 +58,15 @@ CREATE TABLE IF NOT EXISTS terms (
   created_at timestamptz DEFAULT now()
 );
 
+-- OTP 코드 테이블 (Aligo SMS 인증용)
+CREATE TABLE IF NOT EXISTS otp_codes (
+  phone text PRIMARY KEY,
+  code text NOT NULL,
+  expires_at timestamptz NOT NULL,
+  attempts int NOT NULL DEFAULT 0,
+  created_at timestamptz DEFAULT now()
+);
+
 -- RLS 비활성화 (service_role 키로만 접근)
 ALTER TABLE users DISABLE ROW LEVEL SECURITY;
 ALTER TABLE categories DISABLE ROW LEVEL SECURITY;
@@ -64,6 +74,7 @@ ALTER TABLE products DISABLE ROW LEVEL SECURITY;
 ALTER TABLE reservations DISABLE ROW LEVEL SECURITY;
 ALTER TABLE reservation_items DISABLE ROW LEVEL SECURITY;
 ALTER TABLE terms DISABLE ROW LEVEL SECURITY;
+ALTER TABLE otp_codes DISABLE ROW LEVEL SECURITY;
 
 -- 동시 예약 방지: 재고 원자적 차감 + 예약 생성
 CREATE OR REPLACE FUNCTION create_reservation_atomic(p_user_id uuid, p_note text, p_items jsonb)
