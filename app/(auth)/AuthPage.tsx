@@ -1,15 +1,11 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, Eye, EyeOff, ChevronDown, ChevronUp } from 'lucide-react'
 import { formatPhone } from '@/lib/formatPhone'
-import { auth } from '@/lib/firebase'
-import { RecaptchaVerifier, signInWithPhoneNumber, type ConfirmationResult } from 'firebase/auth'
 import type { Term } from '@/lib/types'
-
-type Step = 'form' | 'otp'
 
 export default function AuthPage({ defaultTab }: { defaultTab: 'login' | 'register' }) {
   const [tab, setTab] = useState<'login' | 'register'>(defaultTab)
@@ -20,13 +16,6 @@ export default function AuthPage({ defaultTab }: { defaultTab: 'login' | 'regist
   const [loading, setLoading] = useState(false)
   const [showPw, setShowPw] = useState(false)
   const router = useRouter()
-
-  // OTP
-  const [step, setStep] = useState<Step>('form')
-  const [otpCode, setOtpCode] = useState('')
-  const [otpSending, setOtpSending] = useState(false)
-  const confirmRef = useRef<ConfirmationResult | null>(null)
-  const recaptchaRef = useRef<RecaptchaVerifier | null>(null)
 
   // Terms
   const [terms, setTerms] = useState<Term[]>([])
@@ -65,17 +54,9 @@ export default function AuthPage({ defaultTab }: { defaultTab: 'login' | 'regist
     setPassword('')
     setName('')
     setShowPw(false)
-    setStep('form')
-    setOtpCode('')
-    confirmRef.current = null
   }
 
-  function toIntlPhone(raw: string) {
-    const digits = raw.replace(/\D/g, '')
-    return '+82' + (digits.startsWith('0') ? digits.slice(1) : digits)
-  }
-
-  async function handleSendOtp() {
+  async function handleRegister() {
     setError('')
     const rawPhone = phone.replace(/\D/g, '')
     if (!name.trim()) { setError('이름을 입력해 주세요'); return }
@@ -86,43 +67,11 @@ export default function AuthPage({ defaultTab }: { defaultTab: 'login' | 'regist
     const missingRequired = requiredTerms.find(t => !agreed[t.id])
     if (missingRequired) { setError(`"${missingRequired.title}"에 동의해 주세요`); return }
 
-    setOtpSending(true)
-    try {
-      if (!recaptchaRef.current) {
-        recaptchaRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' })
-      }
-      const result = await signInWithPhoneNumber(auth, toIntlPhone(phone), recaptchaRef.current)
-      confirmRef.current = result
-      setStep('otp')
-      setOtpCode('')
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : ''
-      if (msg.includes('invalid-phone-number')) setError('올바른 전화번호 형식이 아닙니다')
-      else if (msg.includes('too-many-requests')) setError('요청이 너무 많습니다. 잠시 후 다시 시도해 주세요')
-      else if (msg.includes('quota-exceeded')) setError('오늘 인증 한도를 초과했습니다. 내일 다시 시도해 주세요')
-      else setError('인증번호 전송에 실패했습니다. 잠시 후 다시 시도해 주세요')
-    } finally {
-      setOtpSending(false)
-    }
-  }
-
-  async function handleRegister() {
-    if (otpCode.length !== 6) { setError('인증번호 6자리를 입력해 주세요'); return }
-    if (!confirmRef.current) { setError('인증 세션이 만료됐습니다. 다시 시도해 주세요'); return }
-    setError('')
     setLoading(true)
-    try {
-      await confirmRef.current.confirm(otpCode)
-    } catch {
-      setError('인증번호가 올바르지 않습니다')
-      setLoading(false)
-      return
-    }
-
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, phone: phone.replace(/\D/g, ''), password }),
+      body: JSON.stringify({ name, phone: rawPhone, password }),
     })
     const data = await res.json()
     setLoading(false)
@@ -238,9 +187,7 @@ export default function AuthPage({ defaultTab }: { defaultTab: 'login' | 'regist
             {/* ── REGISTER ── */}
             {tab === 'register' && (
               <div className="space-y-3">
-                {step === 'form' ? (
-                  <>
-                    {/* Fields */}
+                {/* Fields */}
                     <div>
                       <label className="block text-[13px] font-semibold mb-1.5" style={{ color: '#17182D' }}>이름</label>
                       <input type="text" value={name} onChange={(e) => setName(e.target.value)}
@@ -314,57 +261,16 @@ export default function AuthPage({ defaultTab }: { defaultTab: 'login' | 'regist
 
                     {error && <div className="px-4 py-3 text-[13px]" style={{ background: '#FFF0E5', borderRadius: 10, color: '#c2410c' }}>{error}</div>}
 
-                    <button onClick={handleSendOtp} disabled={otpSending}
-                      className="w-full py-3.5 font-bold text-[15px] text-white disabled:opacity-50"
-                      style={{ background: '#F5A623', borderRadius: 12 }}>
-                      {otpSending ? '전송 중...' : '인증번호 받기'}
-                    </button>
-                  </>
-                ) : (
-                  /* OTP step */
-                  <>
-                    <div className="text-center py-2">
-                      <p className="text-[13px]" style={{ color: 'rgba(23,24,45,0.5)' }}>
-                        <span className="font-bold" style={{ color: '#17182D' }}>{phone}</span>으로<br />
-                        인증번호 6자리를 전송했습니다
-                      </p>
-                    </div>
-                    <div>
-                      <label className="block text-[13px] font-semibold mb-1.5" style={{ color: '#17182D' }}>인증번호</label>
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        value={otpCode}
-                        onChange={e => setOtpCode(e.target.value.slice(0, 6))}
-                        placeholder="000000"
-                        className="w-full px-4 py-3 text-[22px] font-bold tracking-widest text-center focus:outline-none"
-                        style={{ ...inputStyle, letterSpacing: '0.2em' }}
-                        autoFocus
-                      />
-                    </div>
-
-                    {error && <div className="px-4 py-3 text-[13px]" style={{ background: '#FFF0E5', borderRadius: 10, color: '#c2410c' }}>{error}</div>}
-
-                    <button onClick={handleRegister} disabled={loading || otpCode.length !== 6}
+                    <button onClick={handleRegister} disabled={loading}
                       className="w-full py-3.5 font-bold text-[15px] text-white disabled:opacity-50"
                       style={{ background: '#F5A623', borderRadius: 12 }}>
                       {loading ? '가입 중...' : '가입 완료'}
                     </button>
-
-                    <button onClick={() => { setStep('form'); setOtpCode(''); setError(''); confirmRef.current = null }}
-                      className="w-full py-2 text-[13px]" style={{ color: 'rgba(23,24,45,0.4)' }}>
-                      ← 이전으로 / 다시 받기
-                    </button>
-                  </>
-                )}
               </div>
             )}
           </div>
         </div>
       </div>
-
-      {/* Invisible reCAPTCHA container */}
-      <div id="recaptcha-container" />
     </div>
   )
 }
